@@ -5,7 +5,6 @@
 
 The HK Rainfall Visualiser is a small desktop application that animates historical Hong Kong monthly rainfall data and lets you open an external rainfall chart viewer.
 
-![alt text](image/example.png)
 
 ## 🌐 Live demo (GitHub Pages)
 
@@ -65,8 +64,3 @@ Preview screenshot:
 See file headers for author credits; license: To be determined.
 <<<<<<< HEAD
 =======
-
-
-# HK-rainfall-visualiser-
-# HK-rainfall-visualiser-
->>>>>>> 00da4f4d53a974ea59b07ba7c18b7a7a8a2b911f
