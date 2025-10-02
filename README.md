@@ -10,7 +10,11 @@ The HK Rainfall Visualiser is a small desktop application that animates historic
 ## 🌐 Live demo (GitHub Pages)
 
 There is an in-browser demo of the visualiser in 
+<<<<<<< HEAD
 `https://janet-chengyutung.github.io/HK-rainfall-visualiser-/`
+=======
+`https://janet0311.github.io/HK-rainfall-visualiser-/`
+>>>>>>> 00da4f4d53a974ea59b07ba7c18b7a7a8a2b911f
  (a JS port of the animation) so visitors can view the animation without downloading the app. When Pages is enabled (Branch: `main`, Folder: `/docs`) the demo is published to the repository's Pages URL.
 
 ## 🔄 Status
@@ -61,3 +65,10 @@ Preview screenshot:
 
 ## 📬 Contact & credits
 See file headers for author credits; license: To be determined.
+<<<<<<< HEAD
+=======
+
+
+# HK-rainfall-visualiser-
+# HK-rainfall-visualiser-
+>>>>>>> 00da4f4d53a974ea59b07ba7c18b7a7a8a2b911f
