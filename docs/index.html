@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width,initial-scale=1">
+		<title>HK Rainfall Visualiser</title>
+		<style>
+			body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial; margin: 32px; background: #f7fafc; color:#0b1220 }
+			a { color:#0b5cff }
+			header { margin-bottom: 18px }
+			.card { background: white; border-radius: 10px; padding: 18px; box-shadow: 0 6px 20px rgba(11,17,32,0.06); max-width: 860px }
+			pre { background:#0b1220; color:#dbeafe; padding:12px; border-radius:8px; overflow:auto }
+			.muted { color:#6b7280 }
+		</style>
+	</head>
+	<body>
+		<header>
+			<h1>HK Rainfall Visualiser</h1>
+			<p class="muted">A pygame-based interactive visualiser for historical Hong Kong rainfall data.</p>
+		</header>
+		<section class="card">
+			<h2>Quick start (run locally)</h2>
+			<ol>
+				<li>Clone the repo: <code>git clone https://github.com/Janet-ChengYutung/HK-rainfall-visualiser-.git</code></li>
+				<li>Install Python and dependencies (recommend a venv):
+					<pre>python3 -m venv .venv
+source .venv/bin/activate
+pip install pygame</pre>
+				</li>
+				<li>Run the app:
+					<pre>python3 Main.py</pre>
+				</li>
+			</ol>
+			<p>If you want a published demo on GitHub Pages, I can either host a static landing page here, or embed a read-only view of the source. Tell me which you prefer.</p>
+			<p>Repository: <a href="https://github.com/Janet-ChengYutung/HK-rainfall-visualiser-">Janet-ChengYutung/HK-rainfall-visualiser-</a></p>
+		</section>
+				<section class="card" style="margin-top:18px">
+					<h2>Live animation demo</h2>
+					<p class="muted">This is a browser port of the visualiser's ASCII-style fluid animation (runs with JavaScript on the page).</p>
+							<div style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap">
+								<button id="playPauseBtn">Pause</button>
+								<label style="font-size:13px">Year: <select id="yearSelect"></select></label>
+								<label style="font-size:13px">Density: <select id="densitySelect"><option value="low">Low</option><option value="med" selected>Medium</option><option value="high">High</option></select></label>
+							</div>
+							<canvas id="animCanvas" style="width:100%; height:360px; display:block; border-radius:8px; background:#000"></canvas>
+							<p class="muted" style="font-size:12px; margin-top:8px">The demo runs entirely in your browser — no download required. Use the controls above to pause, change the year (animation speed), or adjust density for performance.</p>
+				</section>
+				<script>
+				// Port of hkvis_core.animationtest.generate_fluid_pattern to JavaScript
+				(function(){
+					const ASCII_CHARS = "@%#*+=-:. ";
+					const baseRAIN = [15.2,8.7,45.3,78.9,156.4,234.7,298.5,267.3,189.6,67.8,23.4,12.1];
+					let currentRain = baseRAIN.slice();
+					let COLS = 100, ROWS = 36;
+					const PADDING = 8;
+					const FONT_SIZE = 14; // base, will scale
+					const SPEED_FACTOR = 6.0;
+					const BASE_TIME_SCALE = 20.0;
+					const SPEED_MULTIPLIER = 3.5;
+					const GLOBAL_MEAN_CAP = 300.0;
+					const TOP_WHITEN_BIAS = 0.30;
+					const BOTTOM_WHITEN_BOOST = 0.25;
+					const BLUE_PALETTE = [ [20,100,255],[10,150,255],[0,200,255],[0,230,220],[60,230,220],[190,245,250] ];
+
+					function lerpColor(a,b,t){ return [ Math.round(a[0]+(b[0]-a[0])*t), Math.round(a[1]+(b[1]-a[1])*t), Math.round(a[2]+(b[2]-a[2])*t) ]; }
+					function rowBaseColor(rowIdx,totalRows){
+						let t = rowIdx / Math.max(1,totalRows-1);
+						let t_top_biased = Math.max(0.0, t - (1.0 - t) * (TOP_WHITEN_BIAS * 0.15));
+						let t_final = t_top_biased;
+						if(t>0.6){
+							let bottom_factor = (t-0.6)/0.4;
+							t_final = Math.min(1.0, t_top_biased + (1.0 - t_top_biased) * (bottom_factor * BOTTOM_WHITEN_BOOST));
+						}
+						let segs = BLUE_PALETTE.length - 1;
+						let seg_pos = t_final * segs;
+						let i = Math.floor(seg_pos);
+						let frac = seg_pos - i;
+						let c1 = BLUE_PALETTE[i];
+						let c2 = BLUE_PALETTE[Math.min(i+1,segs)];
+						let base = lerpColor(c1,c2,frac);
+						let top_influence = Math.max(0.0, 1.0 - t) * TOP_WHITEN_BIAS;
+						let bottom_influence = 0.0;
+						if(t>0.6){ bottom_influence = ((t-0.6)/0.4) * BOTTOM_WHITEN_BOOST; }
+						let whiten_amount = Math.min(1.0, top_influence + bottom_influence);
+						if(whiten_amount>0){ base = lerpColor(base, [255,255,255], whiten_amount * 0.9); }
+						return base;
+					}
+					function applyDensityTint(base, norm){
+						const bright = [230,255,255];
+						const t1 = norm;
+						let c_mid = lerpColor(base, bright, t1 * 0.95);
+						let r = c_mid[0], g = Math.min(255, Math.round(c_mid[1] + 35 * norm)), b = Math.min(255, Math.round(c_mid[2] + 70 * norm));
+						return [r,g,b];
+					}
+					function finalCellColor(base, norm, time_mod, white_factor){
+						let mod = 1.0 + (time_mod - 0.5) * 0.08;
+						let [r,g,b] = applyDensityTint(base, norm);
+						r = Math.max(0, Math.min(255, Math.round(r * mod)));
+						g = Math.max(0, Math.min(255, Math.round(g * mod)));
+						b = Math.max(0, Math.min(255, Math.round(b * mod)));
+						if(white_factor && white_factor>0){
+							let wr = Math.round(255 * white_factor + r * (1-white_factor));
+							let wg = Math.round(255 * white_factor + g * (1-white_factor));
+							let wb = Math.round(255 * white_factor + b * (1-white_factor));
+							return [wr,wg,wb];
+						}
+						return [r,g,b];
+					}
+
+					function generateFluidPattern(data, globalTime, cols=COLS, rows=ROWS){
+						let max_val = 1.0; let mean_intensity = 0.0;
+						if(data && data.length){ max_val = Math.max(...data); let mean_val = data.reduce((a,b)=>a+b,0)/data.length; mean_intensity = Math.min(1.0, mean_val / GLOBAL_MEAN_CAP); }
+						let data_speed_multiplier = 0.3 + Math.pow(mean_intensity,0.7) * 2.0;
+						let effective_speed_factor = SPEED_FACTOR * data_speed_multiplier * SPEED_MULTIPLIER;
+						const grid = new Array(rows);
+						for(let y=0;y<rows;y++){
+							let rowChars = new Array(cols);
+							for(let x=0;x<cols;x++){
+								let data_index = Math.floor((x/cols) * data.length);
+								let intensity = data.length? data[data_index] / Math.max(1,max_val) : 0;
+								let time_scale = BASE_TIME_SCALE + intensity * effective_speed_factor;
+								let t = globalTime * time_scale;
+								let flowX = x + (t * 0.2);
+								let flowY = y - (t * 0.8);
+								let wave1 = Math.sin((x * 0.18) + (flowY * 0.12) + (t * 0.05)) * 0.5 + 0.5;
+								let wave2 = Math.sin((x * 0.08) + (flowY * 0.22) + (t * 0.08)) * 0.4 + 0.6;
+								let wave3 = Math.cos((x * 0.25) + (flowY * 0.08) - (t * 0.06)) * 0.5 + 0.5;
+								let wave4 = Math.sin((flowX * 0.15) + (flowY * 0.35) + (t * 0.1)) * 0.3 + 0.7;
+								let horizontalFlow = Math.sin((x * 0.15) + (t * 0.12)) * 0.3;
+								let diagonalFlow = Math.cos((x * 0.08) + (y * 0.08) + (t * 0.09)) * 0.25;
+								let combined = (wave1 + wave2 + wave3 + wave4) / 4.0 + horizontalFlow + diagonalFlow;
+								let modulated = combined * intensity;
+								let noise1 = Math.sin(x * 0.5 + flowY * 0.4 + t * 0.15) * 0.2;
+								let noise2 = Math.cos(x * 0.7 + y * 0.3 + t * 0.12) * 0.15;
+								let randomness = Math.sin(x * 1.2 + y * 0.8 + t * 0.18) * Math.cos(x * 0.6 + y * 1.1) * 0.25;
+								let final = modulated + noise1 + noise2 + randomness;
+								let charRandom = Math.sin(x * 0.3 + y * 0.5 + t * 0.1) * 0.1;
+								let adjustedFinal = final + charRandom;
+								let norm = (Math.tanh(adjustedFinal) + 1.0) / 2.0;
+								let idx = Math.floor(norm * (ASCII_CHARS.length - 1));
+								idx = Math.max(0, Math.min(ASCII_CHARS.length - 1, idx));
+								let ch = ASCII_CHARS[idx];
+								rowChars[x] = [ch, norm];
+							}
+							grid[y] = rowChars;
+						}
+						return grid;
+					}
+
+					// Canvas setup
+					const canvas = document.getElementById('animCanvas');
+					const ctx = canvas.getContext('2d');
+					function resizeCanvas(){
+						const dpr = window.devicePixelRatio || 1;
+						const rect = canvas.getBoundingClientRect();
+						canvas.width = Math.max(200, Math.floor(rect.width * dpr));
+						canvas.height = Math.max(120, Math.floor(rect.height * dpr));
+						ctx.setTransform(dpr,0,0,dpr,0,0);
+					}
+					window.addEventListener('resize', resizeCanvas);
+					resizeCanvas();
+
+					let lastTime = performance.now();
+					let frameTime = 0.0;
+
+					function draw(){
+						const now = performance.now();
+						const dt = Math.min(0.05, (now - lastTime) / 1000);
+						lastTime = now;
+								// advance time only when playing
+								if(playing) frameTime += dt;
+
+								const grid = generateFluidPattern(currentRain, frameTime, COLS, ROWS);
+						// draw background
+						ctx.fillStyle = 'black';
+						ctx.fillRect(0,0,canvas.width,canvas.height);
+						// compute cell size
+						const cellW = (canvas.width / (window.devicePixelRatio||1)) / COLS;
+						const cellH = (canvas.height / (window.devicePixelRatio||1)) / ROWS;
+						// choose font size to fit
+						ctx.font = Math.floor(cellH * 0.95) + 'px monospace';
+						ctx.textAlign = 'center';
+						ctx.textBaseline = 'middle';
+						for(let ry=0; ry<ROWS; ry++){
+							const base = rowBaseColor(ry, ROWS);
+							for(let rx=0; rx<COLS; rx++){
+								const [ch, norm] = grid[ry][rx];
+								const col_mod = (Math.sin((frameTime * 1.2) + rx * 0.12) + 1) / 2;
+								const seed = (ry * 1315423911) ^ (rx * 2654435761);
+								const phase = (seed % 1000) / 1000.0;
+								const white_osc = (Math.sin(frameTime * 1.5 + phase * 6.28318) + 1) / 2;
+								let white_factor = Math.pow(white_osc, 3) * 0.9;
+								const sparsity = ((seed >> 3) & 31) / 31.0;
+								white_factor = white_factor * (sparsity * 0.8);
+								const color = finalCellColor(base, norm, col_mod, white_factor);
+								ctx.fillStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
+								const cx = (rx + 0.5) * cellW;
+								const cy = (ry + 0.5) * cellH;
+								ctx.fillText(ch, cx, cy);
+							}
+						}
+												requestAnimationFrame(draw);
+											}
+														// Use original bundled audio file for playback (copied to docs/assets)
+														const AudioPlayer = (function(){
+															let audioEl = null;
+															function ensure(){
+																if(audioEl) return;
+																audioEl = document.createElement('audio');
+																audioEl.src = 'assets/rain_sound_image.mp3';
+																audioEl.loop = true;
+																audioEl.preload = 'auto';
+																audioEl.volume = 0.36;
+																audioEl.crossOrigin = 'anonymous';
+																document.body.appendChild(audioEl);
+															}
+															return {
+																start: async function(){ ensure(); try{ await audioEl.play(); }catch(e){ /* browsers may require gesture first */ }									},
+																stop: function(){ if(audioEl){ audioEl.pause(); audioEl.currentTime = 0; } }
+															};
+														})();
+														// Controls and responsiveness (setup once)
+														const playPauseBtn = document.getElementById('playPauseBtn');
+										const yearSelect = document.getElementById('yearSelect');
+										const densitySelect = document.getElementById('densitySelect');
+										let playing = true;
+										let audioPlaying = false;
+										playPauseBtn.addEventListener('click', async ()=>{ 
+											playing = !playing; 
+											playPauseBtn.textContent = playing? 'Pause' : 'Play'; 
+											try{
+												if(playing){
+													AudioPlayer.start(); audioPlaying = true;
+												} else {
+													AudioPlayer.stop(); audioPlaying = false;
+												}
+											}catch(e){ console.warn('Audio error', e); }
+										});
+										// populate years (1884..2025 as in Python)
+										for(let y=1884;y<=2025;y++){
+											const opt = document.createElement('option'); opt.value = y; opt.textContent = y; if(y===2025) opt.selected = true; yearSelect.appendChild(opt);
+										}
+										let selectedYear = 2025;
+										function updateRainDataForYear(year){
+											const yearNorm = (year - 1884) / (2025 - 1884);
+											const scale = 0.5 + yearNorm * 1.0; // scale in [0.5..1.5]
+											currentRain = baseRAIN.map(v=> v * scale);
+										}
+										updateRainDataForYear(selectedYear);
+										yearSelect.addEventListener('change', ()=>{ selectedYear = parseInt(yearSelect.value,10) || 2025; updateRainDataForYear(selectedYear); });
+										densitySelect.addEventListener('change', ()=>{ const v = densitySelect.value; if(v==='low'){ COLS = 60; ROWS = 24 } else if(v==='med'){ COLS = 100; ROWS = 36 } else { COLS = 140; ROWS = 48 } resizeCanvas(); });
+										// reduce density on small screens and sync density select
+										function adaptDensityForScreen(){ if(window.innerWidth < 640){ COLS = 60; ROWS = 24; densitySelect.value='low' } }
+										adaptDensityForScreen();
+										window.addEventListener('resize', ()=>{ adaptDensityForScreen(); resizeCanvas(); });
+										requestAnimationFrame(draw);
+										// Ensure audio is stopped when leaving the page
+										window.addEventListener('pagehide', ()=>{ try{ AudioPlayer.stop(); }catch(e){} });
+				})();
+				</script>
+		<footer style="margin-top:18px; max-width:860px" class="muted">Note: The interactive visualiser is a local pygame app and cannot run directly inside GitHub Pages. This page provides instructions and download links.</footer>
+	</body>
+</html>
