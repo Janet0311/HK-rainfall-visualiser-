@@ -37,10 +37,6 @@ pip install -r requirements.txt
 python Main.py
 ```
 
-Preview screenshot:
-
-![Example visualiser screenshot](docs/assets/example.png)
-
 
 ## 📦 Packaging and Downloads
 - CI builds for macOS and Windows create packaged executables and publish them as a GitHub Release titled "HK Rainfall Visualiser". Check the repository's Releases page to download the artifacts.
