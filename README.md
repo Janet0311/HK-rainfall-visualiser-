@@ -62,5 +62,3 @@ Preview screenshot:
 
 ## 📬 Contact & credits
 See file headers for author credits; license: To be determined.
-<<<<<<< HEAD
-=======
