@@ -1,7 +1,7 @@
 
 # 🌧️ HK Rainfall Visualiser
 
-**Note:** This repository is a backup. My original account was suspended, so the project is now maintained here. The new repo link is: [https://github.com/Janet0311/HK-rainfall-visualiser-](https://github.com/Janet0311/HK-rainfall-visualiser-)
+**Note:** This repository is a backup. My original account was suspended. My new account: JanetCheng0311.
 
 The HK Rainfall Visualiser is a small desktop application that animates historical Hong Kong monthly rainfall data and lets you open an external rainfall chart viewer.
 
